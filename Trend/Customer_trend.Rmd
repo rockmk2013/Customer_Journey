@@ -1,0 +1,61 @@
+---
+title: "customer_trend"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(ggplot2)
+library(dplyr)
+library(data.table)
+```
+
+#import data
+```{r}
+life8_daily_chiayi <- read.table("life8/life8_daily_chiayi.csv",sep = ",",header = TRUE,encoding = "utf-8")
+life8_daily_chiayi
+```
+
+#customer-trend fake data test
+```{r}
+step = c("Base","Awareness","Potential","Desire","Transaction")
+scale= c(0.8,0.2,0.3,0.5,0.2)
+scale1= c(0.7,0.3,0.2,0.6,0.4)
+step = factor(step,levels=c("Transaction","Desire","Potential","Awareness","Base"))
+library(gridExtra)
+new = data.frame(step,scale)
+new = melt(new,id="step")
+
+g1=data.frame(step,scale) %>% ggplot(aes(step,scale,group=1))+geom_line(color="steelblue",lwd=2)+geom_point(size=5,shape=21,color="steelblue",fill="white",stroke=2)+ylim(0,1)+coord_flip()+ggtitle("non-promotion")+theme_bw()+theme(plot.title = element_text(hjust = 0.5))
+
+g2=data.frame(step,scale1) %>% ggplot(aes(step,scale1,group=1))+geom_line(color="steelblue",size=2)+geom_point(size=5,shape=21,color="steelblue",fill="white",stroke=2)+ylim(0,1)+coord_flip()+ggtitle("promotion")+theme_bw()+theme(plot.title = element_text(hjust = 0.5))
+
+grid.arrange(g1,g2,ncol=2)
+
+```
+
+#chiayi customer trend
+```{r}
+touch = rowSums(life8_daily_chiayi[,grepl("Touch",colnames(life8_daily_chiayi))],na.rm = TRUE)
+life8_daily_chiayi =  life8_daily_chiayi %>% mutate(touch)
+scale = function(variable){
+  return((variable-min(variable))/diff(range(variable)))
+}
+scale_total = cbind(life8_daily_chiayi[,21:23],sapply(life8_daily_chiayi[,c(5,6,24,10,128)],scale))
+
+all = scale_total %>% mutate(holiday = if_else(NormalVacation==1|SpecialVacation==1|ConsistentVacation==1,1,0)) %>% group_by(holiday) %>% summarise(mean(StorefrontTraffic),mean(InstoreTraffic),mean(touch),mean(X2Floor.Traffic),mean(Transaction))
+step = c("Base","Awareness","Interact","Desire","Transaction")
+step = factor(step,levels=c("Transaction","Desire","Interact","Awareness","Base"))
+trend_data = cbind(step,transpose(all[,2:6]))
+
+
+colnames(trend_data)[2:3]=c("NormalDay","Holiday")
+library(reshape2)
+new =melt(trend_data,id="step")
+
+ggplot(new,aes(step,value,colour=variable))+geom_line(aes(group=variable),lwd=2)+geom_point(size=7,shape=21,fill="white",stroke=2)+ylim(0,1)+coord_flip()+ggtitle("NormalDay/Holiday")+theme_bw()+theme(plot.title = element_text(hjust = 0.5))
+
+```
